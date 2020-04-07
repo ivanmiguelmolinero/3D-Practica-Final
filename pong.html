@@ -27,14 +27,22 @@
       document.body.appendChild(renderer.domElement);
 
       var light = getLight();
-      var leftBorder = getBorder("left", 1, 30, 2, -7, 0, 0);
-      var rightBorder = getBorder("right", 1, 30, 2, 7, 0, 0);
-      var topBorder = getBorder("top", 11, 1, 2, 0, 15, 0);
-      var downBorder = getBorder("down", 4, 1, 2, 0, -14.5, 0);
       var sphere = getSphere();
       var floor = getFloor();
+      var leftBorder = getBorder("left", 1, 28, 2, -7, 0, 0);
+      var rightBorder = getBorder("right", 1, 28, 2, 7, 0, 0);
+      var topBorder = getBorder("top", 5, 1, 2, sphere.position.x, 15, 0);
+      var downBorder = getBorder("down", 4, 1, 2, 0, -14.5, 0);
+      var sithLight = new THREE.PointLight(0xff0000, 1, 100 );
+      sithLight.position.set( downBorder.position.x, downBorder.position.y, downBorder.position.z );
+      sithLight.castShadow = true;
+      var jediLight = new THREE.PointLight(0x00ff00, 1, 100 );
+      jediLight.position.set( topBorder.position.x, topBorder.position.y, topBorder.position.z );
+      jediLight.castShadow = true;
 
       scene.add(light);
+      scene.add(sithLight);
+      scene.add(jediLight);
       scene.add(leftBorder);
       scene.add(rightBorder);
       scene.add(topBorder);
@@ -44,14 +52,41 @@
 
       var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
 
+      window.onkeydown = function(e) {
+         var step = new Number(document.getElementById("step").value);
+         switch (e.key) {
+           case 'ArrowLeft':
+             initVertexShader(gl,vertexesAndTextures_L);
+             rotateX= 0.0;
+             rotateY += step;
+             break;
+          case 'ArrowRight':
+            initVertexShader(gl,vertexesAndTextures_R);
+            rotateX = 0.0;
+            rotateY -= step;
+          }
+        }
+
       animate(sphere, borders, renderer, scene, camera);
    }
 
    function animate(sphere, borders, renderer, scene, camera) {
       checkCollision(sphere, borders);
+      console.log("salgo");
 
       sphere.position.x += stepX;
       sphere.position.y += stepY;
+
+      borders[2].position.x = sphere.position.x;
+      window.onkeydown = function(e) {
+         switch (e.key) {
+           case 'ArrowLeft':
+             borders[3].position.x -= 0.15;
+             break;
+           case 'ArrowRight':
+             borders[3].position.x += 0.15;
+          }
+        }
 
       renderer.render(scene, camera);
 
@@ -76,10 +111,10 @@
    }
 
    function getSphere() {
-      var geometry = new THREE.SphereGeometry(1, 20, 20);
+      var geometry = new THREE.SphereGeometry(0.5, 20, 20);
       var material = new THREE.MeshNormalMaterial();
       var mesh = new THREE.Mesh(geometry, material);
-      mesh.position.z = 1;
+      mesh.position.z = 0.5;
       mesh.castShadow = true;
       mesh.name = "sphere";
 
@@ -96,7 +131,7 @@
 
    function getBorder(name, x, y, z, posX, posY, posZ) {
       var geometry = new THREE.BoxGeometry(x, y, z);
-      var mesh = new THREE.Mesh(geometry, getFloorMaterial());
+      var mesh = new THREE.Mesh(geometry, getFloorMaterial(name));
       mesh.receiveShadow = true;
       mesh.position.set(posX, posY, posZ);
       mesh.name = name;
@@ -104,11 +139,17 @@
       return mesh;
    }
 
-   function getFloorMaterial() {
-      var texture = new THREE.TextureLoader().load("deathstar.jpg");
-      var material = new THREE.MeshPhysicalMaterial({
-         map : texture
-      });
+   function getFloorMaterial(name) {
+     if (name == "top") {
+       var texture = new THREE.TextureLoader().load("sith.jpg")
+     } else if (name == "down") {
+       var texture = new THREE.TextureLoader().load("jedi.jpg")
+     } else {
+       var texture = new THREE.TextureLoader().load("deathstar.jpg");
+     }
+     var material = new THREE.MeshPhysicalMaterial({
+       map : texture
+     });
 
 
       return material;
@@ -127,6 +168,7 @@
             // Collision detected
             if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") {
                stepX *= -1;
+               console.log("borde");
             }
             if (collisionResults[0].object.name == "down" || collisionResults[0].object.name == "top") {
                stepY *= -1;
