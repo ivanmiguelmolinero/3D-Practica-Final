@@ -9,6 +9,7 @@
 <script>
    var stepX = 0.15;
    var stepY = 0.25;
+   var play = false;
 
    function init() {
       var scene = new THREE.Scene();
@@ -55,30 +56,25 @@
 
       var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
 
-      window.onkeydown = function(e) {
-         var step = new Number(document.getElementById("step").value);
-         switch (e.key) {
-           case 'ArrowLeft':
-             initVertexShader(gl,vertexesAndTextures_L);
-             rotateX= 0.0;
-             rotateY += step;
-             break;
-          case 'ArrowRight':
-            initVertexShader(gl,vertexesAndTextures_R);
-            rotateX = 0.0;
-            rotateY -= step;
-          }
-        }
-
       animate(sphere, borders, renderer, scene, camera);
+
    }
 
    function animate(sphere, borders, renderer, scene, camera) {
       checkCollision(sphere, borders);
-      console.log("salgo");
 
-      sphere.position.x += stepX;
-      sphere.position.y += stepY;
+      if (play) {
+        sphere.position.x += stepX;
+        sphere.position.y += stepY;
+      }
+
+      if (sphere.position.y < borders[3].position.y){
+        play = false;
+        scene.remove(sphere);
+        sphere = getSphere();
+        scene.add(sphere);
+        borders[3].position.x = sphere.position.x;
+      }
 
       borders[2].position.x = sphere.position.x;
       window.onkeydown = function(e) {
@@ -88,8 +84,13 @@
              break;
            case 'ArrowRight':
              borders[3].position.x += 0.3;
+             break;
+           case ' ':
+             play = true;
           }
         }
+
+        
 
       renderer.render(scene, camera);
 
@@ -171,7 +172,6 @@
             // Collision detected
             if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") {
                stepX *= -1;
-               console.log("borde");
             }
             if (collisionResults[0].object.name == "down" || collisionResults[0].object.name == "top") {
                stepY *= -1;
