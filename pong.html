@@ -10,6 +10,15 @@
    var stepX = 0.15;
    var stepY = 0.25;
    var play = false;
+   var str1 = "Sith ";
+   var puntosCPU = 0;
+   var str3 = "-";
+   var str4 = 0;
+   var str5 = " Jedi"
+   var texto = str1.concat(puntosCPU,str3,str4,str5);
+   var textMesh;
+   var textMeshFin;
+   var fin = false;
 
    function init() {
       var scene = new THREE.Scene();
@@ -43,6 +52,7 @@
       var jediLight = new THREE.PointLight(0x00ff00, 1, 100 );
       jediLight.position.set( topBorder.position.x, topBorder.position.y, topBorder.position.z );
       jediLight.castShadow = true;
+    //  var text = getText();
 
       scene.add(light);
       scene.add(sithLight);
@@ -53,11 +63,16 @@
       scene.add(downBorder);
       scene.add(sphere);
       scene.add(floor);
+      var axes = new THREE.AxesHelper(50);
+      scene.add(axes);
+  //    scene.add(text);
 
+      addText(scene,texto);
       var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
 
+      if (!fin){
       animate(sphere, borders, renderer, scene, camera);
-
+    }
    }
 
    function animate(sphere, borders, renderer, scene, camera) {
@@ -68,16 +83,29 @@
         sphere.position.y += stepY;
       }
 
-      if (sphere.position.y < borders[3].position.y){
+      if (sphere.position.y < borders[3].position.y && !fin){
+        puntosCPU += 1;
         play = false;
+      //  console.log(puntosCPU);
+        scene.remove(textMesh);
         scene.remove(sphere);
-        sphere = getSphere();
-        scene.add(sphere);
-        borders[3].position.x = sphere.position.x;
+        if (puntosCPU >= 5) {
+          texto = 'Han ganado los SITH, la republica ha caido!';
+          fin = true;
+        } else {
+          texto = str1.concat(puntosCPU,str3,str4,str5);
+          sphere = getSphere();
+          scene.add(sphere);
+          borders[3].position.x = sphere.position.x;
+          console.log(texto);
+        }
+        addText(scene,texto, fin);
+
       }
 
       borders[2].position.x = sphere.position.x;
       window.onkeydown = function(e) {
+        console.log(e.key)
          switch (e.key) {
            case 'ArrowLeft':
              borders[3].position.x -= 0.3;
@@ -86,17 +114,82 @@
              borders[3].position.x += 0.3;
              break;
            case ' ':
-             play = true;
+             if (!play) {
+               play = true;
+             }
+           case 'Enter':
+              if (fin) {
+                fin = false;
+                puntosCPU = 0;
+                stepX = 0.15;
+                stepY = 0.25;
+                scene.remove(textMesh);
+                scene.remove(textMeshFin);
+                texto = str1.concat(puntosCPU,str3,str4,str5);
+                sphere = getSphere();
+                scene.add(sphere);
+                addText(scene,texto, fin);
+                borders[3].position.x = sphere.position.x;
+              }
           }
         }
 
-        
+
 
       renderer.render(scene, camera);
+
 
       requestAnimationFrame(function() {
          animate(sphere, borders, renderer, scene, camera);
       });
+   }
+
+   function addText(scene,texto, fin){
+
+    /* if (puntosCPU /= 0) {
+       scene.remove(textMesh);
+     } */
+     var loader = new THREE.FontLoader();
+
+     loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+
+        var geometry = new THREE.TextGeometry( texto, {
+          font: font,
+          size: 2,
+          height: 0.5,
+          curveSegments: 12,
+          bevelEnabled: false,
+          bevelThickness: 0.1,
+          bevelSize: 0.1,
+          bevelSegments: 0.1
+       });
+       var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000});
+       textMesh = new THREE.Mesh(geometry, textMaterial);
+       textMesh.position.set(-25, 30, 0);
+       textMesh.rotation.x = -5;
+       scene.add(textMesh);
+     });
+
+     if (fin) {
+       loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+
+          var geometry = new THREE.TextGeometry( 'Presiona intro para una nueva partida', {
+            font: font,
+            size: 2,
+            height: 0.5,
+            curveSegments: 12,
+            bevelEnabled: false,
+            bevelThickness: 0.1,
+            bevelSize: 0.1,
+            bevelSegments: 0.1
+         });
+         var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000});
+         textMeshFin = new THREE.Mesh(geometry, textMaterial);
+         textMeshFin.position.set(-20, 20, 0);
+         textMeshFin.rotation.x = -5;
+         scene.add(textMeshFin);
+       });
+     }
    }
 
    function getLight() {
@@ -158,6 +251,27 @@
 
       return material;
    }
+
+  /* function getText() {
+     var loader = new THREE.FontLoader();
+
+     loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+
+ 	   var geometry = new THREE.TextGeometry( 'Hello three.js!', {
+ 	     font: font,
+ 	   	 size: 80,
+ 		   height: 5,
+   		 curveSegments: 12,
+   		 bevelEnabled: true,
+   		 bevelThickness: 10,
+   		 bevelSize: 8,
+   		 bevelOffset: 0,
+   		 bevelSegments: 5
+ 	  });
+   });
+   var mesh = new THREE.Mesh(geometry,loader);
+   return mesh;
+ } */
 
    function checkCollision(sphere, borders) {
       var originPosition = sphere.position.clone();
