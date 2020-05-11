@@ -1,24 +1,45 @@
+<!--
+Partes implementadas:
+- Funcionalidad básica
+- Funcionalidad avanzada (ángulo de rebote variable, velocidad de
+desplazamiento vertical variable, posibilidad de ganar a la CPU)
+- Mejoras: se aumenta el nivel de dificultad cada vez que el jugador gana a la CPU hasta el nivel 4
+           texto 3D para indicar el marcador, el nivel y para lanzar mensajes al usuario
+           sonido cada vez que la bola impacta con una pala
+-->
+
 <!DOCTYPE html>
+
 <html>
 
 <head>
 <title>Pong Wars</title>
-
+<audio src="lightsaber-clash.mp3" id="audiochoque"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/103/three.min.js"></script>
 
 <script>
    var stepX = 0.15;
    var stepY = 0.25;
+   var stepCpu = 0.15;
    var play = false;
-   var str1 = "Sith ";
+   var Cpu = "Sith ";
    var puntosCPU = 0;
-   var str3 = "-";
-   var str4 = 0;
-   var str5 = " Jedi"
-   var texto = str1.concat(puntosCPU,str3,str4,str5);
+   var guion = "-";
+   var puntosJugador = 0;
+   var Jugador = " Jedi"
+   var texto = Cpu.concat(puntosCPU,guion,puntosJugador,Jugador);
    var textMesh;
    var textMeshFin;
+   var TextMeshLevel;
    var fin = false;
+   var primerToque = false;
+   var direccion = "derecha";
+   // Variable rebote creada para evitar el bug del rebote "infinito" y que cuando toque una pala, rebote limpiamente
+   var rebote = false;
+   var audiopelota = document.getElementById("audiochoque");
+   var level = 1;
+   var textoNivel = "Nivel: ";
+   var nivel = textoNivel.concat(level);
 
    function init() {
       var scene = new THREE.Scene();
@@ -44,15 +65,11 @@
       var floor = getFloor();
       var leftBorder = getBorder("left", 1, 28, 2, -7, 0, 0);
       var rightBorder = getBorder("right", 1, 28, 2, 7, 0, 0);
-      var topBorder = getBorder("top", 5, 1, 2, sphere.position.x, 15, 0);
-      var downBorder = getBorder("down", 4, 1, 2, 0, -14.5, 0);
-      var sithLight = new THREE.PointLight(0xff0000, 1, 100 );
-      sithLight.position.set( downBorder.position.x, downBorder.position.y, downBorder.position.z );
-      sithLight.castShadow = true;
-      var jediLight = new THREE.PointLight(0x00ff00, 1, 100 );
-      jediLight.position.set( topBorder.position.x, topBorder.position.y, topBorder.position.z );
-      jediLight.castShadow = true;
-    //  var text = getText();
+      var topBorder = getBorder("cpu", 5, 1, 2, 0, 15, 0);
+      var downBorder = getBorder("player", 4, 1, 2, 0, -14.5, 0);
+      var sithLight = getPointLight(downBorder.position.x, downBorder.position.y, downBorder.position.z)
+      var jediLight = getPointLight(topBorder.position.x, topBorder.position.y, topBorder.position.z);
+
 
       scene.add(light);
       scene.add(sithLight);
@@ -63,11 +80,9 @@
       scene.add(downBorder);
       scene.add(sphere);
       scene.add(floor);
-      var axes = new THREE.AxesHelper(50);
-      scene.add(axes);
-  //    scene.add(text);
 
-      addText(scene,texto);
+      addText(scene,texto,fin,false);
+      addText(scene,nivel,fin,true);
       var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
 
       if (!fin){
@@ -78,99 +93,147 @@
    function animate(sphere, borders, renderer, scene, camera) {
       checkCollision(sphere, borders);
 
+      // Movimiento de la bola
       if (play) {
         sphere.position.x += stepX;
         sphere.position.y += stepY;
       }
 
-      if (sphere.position.y < borders[3].position.y && !fin){
-        puntosCPU += 1;
+      // Se ha metido un punto
+      if ((sphere.position.y < borders[3].position.y || sphere.position.y > borders[2].position.y) && !fin) {
+        // Punto de la CPU
+        if (sphere.position.y < borders[3].position.y) {
+          puntosCPU += 1;
+          stepX = 0.15;
+        } else { // Punto del jugador
+          puntosJugador += 1;
+          stepX = 0.15;
+        }
         play = false;
-      //  console.log(puntosCPU);
         scene.remove(textMesh);
         scene.remove(sphere);
-        if (puntosCPU >= 5) {
+        if (puntosCPU >= 5) { // Ha ganado la CPU
           texto = 'Han ganado los SITH, la republica ha caido!';
           fin = true;
-        } else {
-          texto = str1.concat(puntosCPU,str3,str4,str5);
+        } else if (puntosJugador >= 5) { // Ha ganado el jugador
+          texto = 'Han ganado los JEDI, has traido el equilibrio a la fuerza!';
+          fin = true;
+        } else { // Aún no ha ganado nadie
+          texto = Cpu.concat(puntosCPU,guion,puntosJugador,Jugador);
           sphere = getSphere();
           scene.add(sphere);
-          borders[3].position.x = sphere.position.x;
-          console.log(texto);
+          borders[3].position.x = borders[2].position.x = 0;
         }
-        addText(scene,texto, fin);
+        addText(scene,texto, fin,false);
 
       }
 
-      borders[2].position.x = sphere.position.x;
+      // Movimiento de la CPU
+      if (play) {
+        if ((borders[2].position.x >= 5 && direccion == "derecha") || (borders[2].position.x <= -5 && direccion == "izquierda")) {
+          stepCpu *= -1;
+          if (direccion == "izquierda"){
+            direccion = "derecha";
+          } else {
+            direccion = "izquierda";
+          }
+        }
+        if (!primerToque) {
+          borders[2].position.x = sphere.position.x;
+        } else {
+          borders[2].position.x += stepCpu;
+        }
+
+      }
+
+      // Controles
       window.onkeydown = function(e) {
-        console.log(e.key)
          switch (e.key) {
-           case 'ArrowLeft':
+           case 'ArrowLeft': // Jugador se mueve a la izquierda
              borders[3].position.x -= 0.3;
              break;
-           case 'ArrowRight':
+           case 'ArrowRight': // Jugador se mueve a la derecha
              borders[3].position.x += 0.3;
              break;
-           case ' ':
-             if (!play) {
+           case ' ': // Saque
+             if (!play && !fin) {
                play = true;
+               primerToque = false;
+               rebote = false;
              }
-           case 'Enter':
+             break;
+           case 'Enter': //Inicio de una nueva partida
               if (fin) {
                 fin = false;
+                if (puntosJugador == 5){ //Gana el jugador, pasamos al siguiente nivel
+                  if (level == 4){
+                    level = 1;
+                    stepY = 0.25;
+                  } else {
+                    level += 1;
+                    stepY *= 1.2;
+                  }
+                  nivel = textoNivel.concat(level);
+                } else { // Gana la CPU
+                  stepY = 0.25;
+                }
+                // Reinicia la partida
                 puntosCPU = 0;
+                puntosJugador = 0;
                 stepX = 0.15;
-                stepY = 0.25;
                 scene.remove(textMesh);
                 scene.remove(textMeshFin);
-                texto = str1.concat(puntosCPU,str3,str4,str5);
+                scene.remove(textMeshLevel);
+                texto = Cpu.concat(puntosCPU,guion,puntosJugador,Jugador);
                 sphere = getSphere();
                 scene.add(sphere);
-                addText(scene,texto, fin);
+                addText(scene,texto, fin,false);
+                addText(scene,nivel, fin,true);
                 borders[3].position.x = sphere.position.x;
               }
           }
         }
 
-
-
       renderer.render(scene, camera);
-
 
       requestAnimationFrame(function() {
          animate(sphere, borders, renderer, scene, camera);
       });
    }
 
-   function addText(scene,texto, fin){
+   function getPointLight(x,y,z){
+     var pointLight = new THREE.PointLight(0xffff00, 1, 100 );
+     pointLight.position.set( x,y,z);
+     pointLight.castShadow = true;
+     return pointLight;
+   }
 
-    /* if (puntosCPU /= 0) {
-       scene.remove(textMesh);
-     } */
-     var loader = new THREE.FontLoader();
+   function addText(scene,texto, fin,addLevel){
 
-     loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+     if (!addLevel) { //Si no tengo que actualizar el nivel...
+       var loader = new THREE.FontLoader();
 
-        var geometry = new THREE.TextGeometry( texto, {
-          font: font,
-          size: 2,
-          height: 0.5,
-          curveSegments: 12,
-          bevelEnabled: false,
-          bevelThickness: 0.1,
-          bevelSize: 0.1,
-          bevelSegments: 0.1
+       loader.load( 'fonts/StarJedi_Regular.json', function ( font ) {
+
+          var geometry = new THREE.TextGeometry( texto, {
+            font: font,
+            size: 2,
+            height: 0.5,
+            curveSegments: 12,
+            bevelEnabled: false,
+            bevelThickness: 0.1,
+            bevelSize: 0.1,
+            bevelSegments: 0.1
+         });
+         var textMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00});
+         textMesh = new THREE.Mesh(geometry, textMaterial);
+         textMesh.position.set(-40, 30, 0);
+         textMesh.rotation.x = -5;
+         scene.add(textMesh);
        });
-       var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000});
-       textMesh = new THREE.Mesh(geometry, textMaterial);
-       textMesh.position.set(-25, 30, 0);
-       textMesh.rotation.x = -5;
-       scene.add(textMesh);
-     });
+    }
 
-     if (fin) {
+     if (fin) { // Si la partida ha terminado...
        loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
 
           var geometry = new THREE.TextGeometry( 'Presiona intro para una nueva partida', {
@@ -188,6 +251,28 @@
          textMeshFin.position.set(-20, 20, 0);
          textMeshFin.rotation.x = -5;
          scene.add(textMeshFin);
+       });
+     }
+     if (addLevel) { // Si tengo que actualizar el nivel...
+       var loader = new THREE.FontLoader();
+
+       loader.load( 'fonts/StarJedi_Regular.json', function ( font ) {
+
+          var geometry = new THREE.TextGeometry( texto, {
+            font: font,
+            size: 2,
+            height: 0.5,
+            curveSegments: 12,
+            bevelEnabled: false,
+            bevelThickness: 0.1,
+            bevelSize: 0.1,
+            bevelSegments: 0.1
+         });
+         var textMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00});
+         textMeshLevel = new THREE.Mesh(geometry, textMaterial);
+         textMeshLevel.position.set(20, 40, 0);
+         textMeshLevel.rotation.x = -5;
+         scene.add(textMeshLevel);
        });
      }
    }
@@ -209,7 +294,10 @@
 
    function getSphere() {
       var geometry = new THREE.SphereGeometry(0.5, 20, 20);
-      var material = new THREE.MeshNormalMaterial();
+      var texture = new THREE.TextureLoader().load("texturaesfera.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+        map : texture
+      });
       var mesh = new THREE.Mesh(geometry, material);
       mesh.position.z = 0.5;
       mesh.castShadow = true;
@@ -237,9 +325,9 @@
    }
 
    function getFloorMaterial(name) {
-     if (name == "top") {
+     if (name == "cpu") {
        var texture = new THREE.TextureLoader().load("sith.jpg")
-     } else if (name == "down") {
+     } else if (name == "player") {
        var texture = new THREE.TextureLoader().load("jedi.jpg")
      } else {
        var texture = new THREE.TextureLoader().load("deathstar.jpg");
@@ -252,27 +340,6 @@
       return material;
    }
 
-  /* function getText() {
-     var loader = new THREE.FontLoader();
-
-     loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
-
- 	   var geometry = new THREE.TextGeometry( 'Hello three.js!', {
- 	     font: font,
- 	   	 size: 80,
- 		   height: 5,
-   		 curveSegments: 12,
-   		 bevelEnabled: true,
-   		 bevelThickness: 10,
-   		 bevelSize: 8,
-   		 bevelOffset: 0,
-   		 bevelSegments: 5
- 	  });
-   });
-   var mesh = new THREE.Mesh(geometry,loader);
-   return mesh;
- } */
-
    function checkCollision(sphere, borders) {
       var originPosition = sphere.position.clone();
 
@@ -284,11 +351,38 @@
          var collisionResults = ray.intersectObjects(borders);
          if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
             // Collision detected
-            if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") {
+            if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") { // Si rebota con uno de los bordes
                stepX *= -1;
-            }
-            if (collisionResults[0].object.name == "down" || collisionResults[0].object.name == "top") {
-               stepY *= -1;
+               rebote = false;
+            }  else if (collisionResults[0].object.name == "player") { // Si rebota con el jugador
+               // Calculo con que parte del jugador ha chocado la bola para cambiar el ángulo en funcion de eso
+               var diff = Math.abs(sphere.position.x - collisionResults[0].object.position.x);
+               if (diff > 1) {
+                 stepX *= 2;
+               } else {
+                 if (Math.abs(stepX) != 0.15) {
+                   stepX *= 0.5;
+                 }
+               }
+               // Evito el bug del rebote infinito
+               if (!rebote){
+                 stepY *=-1;
+                 rebote = true;
+                 audiochoque.play();
+               }
+            } else if (collisionResults[0].object.name == "cpu") { // Si rebota con la CPU
+              if (!primerToque) { // Al principio la CPU seguirá la bola hasta que le de el primer toque
+                primerToque = true;
+              }
+              if (Math.abs(stepX) >= 0.3) { // Si la bola va rápido le reduzco la velocidad
+                stepX *= 0.5;
+              }
+              // Evito el bug del rebote infinito
+              if (!rebote){
+                stepY *=-1;
+                rebote = true;
+                audiochoque.play();
+              }
             }
             break;
          }
